@@ -1,7 +1,12 @@
 import * as React from "react";
 import { ImageResponse } from "workers-og";
-import { templates } from "./templates";
 import { ImmutableHeaders } from "immurl";
+import { ZodSchema } from "zod";
+
+interface TemplateModule {
+  default: React.ComponentType<any>;
+  propsSchema: ZodSchema<any>;
+}
 
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -13,8 +18,6 @@ export default {
 
     const match = pattern.exec(url);
 
-    console.log(match);
-
     if (!match) {
       return new Response("Not found", { status: 404 });
     }
@@ -22,9 +25,11 @@ export default {
     // Non-null assertion is safe because the pattern won't match otherwise
     const templateName = match.pathname.groups.template!;
 
-    const module = templates[templateName];
-
-    if (!module) {
+    let module: TemplateModule;
+    try {
+      module = await import(`./templates/${templateName}`);
+    } catch (error) {
+      console.error(error);
       return new Response("Template not found", { status: 404 });
     }
 
