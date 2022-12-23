@@ -3,8 +3,20 @@ import { ImageResponse } from "workers-og";
 import { templates } from "./templates";
 import { ImmutableHeaders } from "immurl";
 
+type Context = EventContext<unknown, string, unknown>;
+
 export default {
-  async fetch(request: Request): Promise<Response> {
+  async fetch(
+    request: Request,
+    _env: unknown,
+    ctx: Context
+  ): Promise<Response> {
+    // Names cache so we can invalidate by changing the name
+    const cache = await caches.open("og");
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
+    }
     const pattern = new URLPattern({
       pathname: "/img/:template",
     });
@@ -46,7 +58,7 @@ export default {
 
     console.log(propsResult.data);
 
-    return new ImageResponse(<Component {...propsResult.data} />, {
+    const response = new ImageResponse(<Component {...propsResult.data} />, {
       width: 1200,
       height: 630,
       fonts: [
@@ -60,6 +72,9 @@ export default {
         },
       ],
     });
+
+    // ctx.waitUntil(cache.put(request, response.clone()));
+    return response;
   },
 };
 
