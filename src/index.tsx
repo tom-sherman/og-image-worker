@@ -75,7 +75,7 @@ export default {
       ],
     });
 
-    // ctx.waitUntil(cache.put(request, response.clone()));
+    ctx.waitUntil(cache.put(request, response.clone()));
     return response;
   },
 };
