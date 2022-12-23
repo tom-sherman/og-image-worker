@@ -19,68 +19,76 @@ export default {
       return cached;
     }
     console.log("Cache miss");
-    const pattern = new URLPattern({
-      pathname: "/img/:template",
-    });
 
-    const url = new URL(request.url);
+    const response = await renderImageResponse(request);
 
-    const match = pattern.exec(url);
+    console.log("cache-control", response.headers.get("Cache-Control"));
 
-    console.log(match);
-
-    if (!match) {
-      return new Response("Not found", { status: 404 });
+    if (response.ok) {
+      ctx.waitUntil(cache.put(request, response.clone()));
     }
-
-    // Non-null assertion is safe because the pattern won't match otherwise
-    const templateName = match.pathname.groups.template!;
-
-    const module = templates[templateName];
-
-    if (!module) {
-      return new Response("Template not found", { status: 404 });
-    }
-
-    const { default: Component, propsSchema } = module;
-
-    const propsResult = propsSchema.safeParse(
-      Object.fromEntries(url.searchParams.entries())
-    );
-
-    if (!propsResult.success) {
-      return json(
-        {
-          message: "Invalid props",
-          errors: propsResult.error.issues,
-        },
-        { status: 400 }
-      );
-    }
-
-    console.log(propsResult.data);
-
-    const response = new ImageResponse(<Component {...propsResult.data} />, {
-      width: 1200,
-      height: 630,
-      fonts: [
-        {
-          name: "Roboto",
-          data: await fetch(
-            "https://cdnjs.cloudflare.com/ajax/libs/materialize/0.98.1/fonts/roboto/Roboto-Regular.ttf"
-          ).then((res) => res.arrayBuffer()),
-          weight: 400,
-          style: "normal",
-        },
-      ],
-    });
-
-    ctx.waitUntil(cache.put(request, response.clone()));
     return response;
   },
 };
 
-const json = (data: any, init?: ResponseInit) => {
+async function renderImageResponse(request: Request): Promise<Response> {
+  const pattern = new URLPattern({
+    pathname: "/img/:template",
+  });
+
+  const url = new URL(request.url);
+
+  const match = pattern.exec(url);
+
+  if (!match) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  // Non-null assertion is safe because the pattern won't match otherwise
+  const templateName = match.pathname.groups.template!;
+
+  const module = templates[templateName];
+
+  if (!module) {
+    return new Response("Template not found", { status: 404 });
+  }
+
+  const { default: Component, propsSchema } = module;
+
+  const propsResult = propsSchema.safeParse(
+    Object.fromEntries(url.searchParams.entries())
+  );
+
+  if (!propsResult.success) {
+    return json(
+      {
+        message: "Invalid props",
+        errors: propsResult.error.issues,
+      },
+      { status: 400 }
+    );
+  }
+
+  return new ImageResponse(<Component {...propsResult.data} />, {
+    width: 1200,
+    height: 630,
+    fonts: [
+      {
+        name: "Roboto",
+        data: await fetch(
+          "https://cdnjs.cloudflare.com/ajax/libs/materialize/0.98.1/fonts/roboto/Roboto-Regular.ttf"
+        ).then((res) => res.arrayBuffer()),
+        weight: 400,
+        style: "normal",
+      },
+    ],
+    headers: {
+      "Cache-Control": "public, max-age=31536000, s-maxage=31536000",
+    },
+  });
+}
+
+function json(data: any, init?: ResponseInit) {
   const headers = new ImmutableHeaders(init?.headers);
   return new Response(JSON.stringify(data), {
     ...init,
@@ -88,4 +96,4 @@ const json = (data: any, init?: ResponseInit) => {
       ? headers
       : headers.set("Content-Type", "application/json"),
   });
-};
+}
