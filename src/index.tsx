@@ -11,42 +11,45 @@ export default {
     _env: unknown,
     ctx: Context
   ): Promise<Response> {
+    const pattern = new URLPattern({
+      pathname: "/img/:template",
+    });
+
+    const url = new URL(request.url);
+
+    const match = pattern.exec(url);
+
+    if (!match) {
+      return new Response("Not found", { status: 404 });
+    }
+
     // Names cache so we can invalidate by changing the name
     const cache = await caches.open("og");
-    const cached = await cache.match(request);
+    const cached = await cache.match(request.url);
     if (cached) {
       console.log("Cache hit");
       return cached;
     }
     console.log("Cache miss");
 
-    const response = await renderImageResponse(request);
+    const response = await renderImageResponse(
+      request,
+      match.pathname.groups.template!
+    );
 
     console.log("cache-control", response.headers.get("Cache-Control"));
 
     if (response.ok) {
-      ctx.waitUntil(cache.put(request, response.clone()));
+      ctx.waitUntil(cache.put(request.url, response.clone()));
     }
     return response;
   },
 };
 
-async function renderImageResponse(request: Request): Promise<Response> {
-  const pattern = new URLPattern({
-    pathname: "/img/:template",
-  });
-
-  const url = new URL(request.url);
-
-  const match = pattern.exec(url);
-
-  if (!match) {
-    return new Response("Not found", { status: 404 });
-  }
-
-  // Non-null assertion is safe because the pattern won't match otherwise
-  const templateName = match.pathname.groups.template!;
-
+async function renderImageResponse(
+  request: Request,
+  templateName: string
+): Promise<Response> {
   const module = templates[templateName];
 
   if (!module) {
@@ -55,6 +58,7 @@ async function renderImageResponse(request: Request): Promise<Response> {
 
   const { default: Component, propsSchema } = module;
 
+  const url = new URL(request.url);
   const propsResult = propsSchema.safeParse(
     Object.fromEntries(url.searchParams.entries())
   );
