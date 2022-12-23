@@ -15,8 +15,10 @@ export default {
     const cache = await caches.open("og");
     const cached = await cache.match(request);
     if (cached) {
+      console.log("Cache hit");
       return cached;
     }
+    console.log("Cache miss");
     const pattern = new URLPattern({
       pathname: "/img/:template",
     });
