@@ -1,0 +1,3 @@
+name = "og-image-worker"
+main = "src/index.tsx"
+compatibility_date = "2022-12-22"
