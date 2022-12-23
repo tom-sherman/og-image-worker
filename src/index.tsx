@@ -33,8 +33,9 @@ export default {
     console.log("Cache miss");
 
     const response = await renderImageResponse(
+      match.pathname.groups.template!,
       request,
-      match.pathname.groups.template!
+      ctx
     );
 
     console.log("cache-control", response.headers.get("Cache-Control"));
@@ -47,8 +48,9 @@ export default {
 };
 
 async function renderImageResponse(
+  templateName: string,
   request: Request,
-  templateName: string
+  context: Context
 ): Promise<Response> {
   const module = templates[templateName];
 
@@ -79,9 +81,10 @@ async function renderImageResponse(
     fonts: [
       {
         name: "Roboto",
-        data: await fetch(
-          "https://cdnjs.cloudflare.com/ajax/libs/materialize/0.98.1/fonts/roboto/Roboto-Regular.ttf"
-        ).then((res) => res.arrayBuffer()),
+        data: await fetchFont(
+          "https://cdnjs.cloudflare.com/ajax/libs/materialize/0.98.1/fonts/roboto/Roboto-Regular.ttf",
+          context
+        ),
         weight: 400,
         style: "normal",
       },
@@ -100,4 +103,18 @@ function json(data: any, init?: ResponseInit) {
       ? headers
       : headers.set("Content-Type", "application/json"),
   });
+}
+
+async function fetchFont(url: string, ctx: Context) {
+  const cache = await caches.open("fonts");
+  const cached = await cache.match(url);
+  if (cached) {
+    console.log("font cache hit");
+    return cached.arrayBuffer();
+  }
+  console.log("font cache miss");
+  const response = await fetch(url);
+  ctx.waitUntil(cache.put(url, response.clone()));
+
+  return response.arrayBuffer();
 }
