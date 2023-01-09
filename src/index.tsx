@@ -76,8 +76,8 @@ async function renderImageResponse(
   }
 
   return new ImageResponse(<Component {...propsResult.data} />, {
-    width: 1200,
-    height: 630,
+    width: 1128,
+    height: 600,
     fonts: [
       {
         name: "Roboto",
